@@ -1,0 +1,9 @@
+[Unit]
+Description=Обновить конфиг xray из VPN-подписки
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Путь к репо поправить под свой сервер
+ExecStart=/opt/autoschool-bot/xray/update_xray.sh

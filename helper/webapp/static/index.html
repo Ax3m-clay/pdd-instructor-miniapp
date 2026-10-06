@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Автошкола</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --surface: var(--tg-theme-section-bg-color, #ffffff);
+    --sunken: var(--tg-theme-secondary-bg-color, #f1f2f5);
+    --text: var(--tg-theme-text-color, #0f1115);
+    --hint: var(--tg-theme-hint-color, #8b8f96);
+    --accent: var(--tg-theme-button-color, #6c5ce7);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --done: #17b26a;
+    --warn: #f79009;
+
+    --line: color-mix(in srgb, var(--hint) 20%, transparent);
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, .05);
+    --shadow-md: 0 6px 20px -6px rgba(16, 24, 40, .16);
+    --shadow-accent: 0 8px 22px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+
+    --ease-out: cubic-bezier(.23, 1, .32, 1);
+    --r-xl: 20px;
+    --r-lg: 16px;
+    --r-md: 13px;
+  }
+  :root[data-scheme="dark"] {
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .45);
+    --shadow-md: 0 6px 20px -6px rgba(0, 0, 0, .6);
+    --line: color-mix(in srgb, var(--hint) 30%, transparent);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden;
+    font: 400 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* ---------- шапка с кольцом прогресса ---------- */
+
+  header {
+    position: sticky; top: 0; z-index: 10; padding: 14px 16px 13px;
+    display: flex; align-items: center; gap: 14px;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+  header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -16px; height: 16px;
+    background: linear-gradient(color-mix(in srgb, var(--bg) 72%, transparent), transparent);
+    pointer-events: none;
+  }
+  .head-text { min-width: 0; flex: 1; }
+  .eyebrow {
+    font-size: 11.5px; font-weight: 650; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--hint);
+  }
+  h1 { margin: 4px 0 0; font-size: 19px; font-weight: 700; line-height: 1.22; letter-spacing: -.02em; }
+
+  .ring { flex: none; width: 50px; height: 50px; position: relative; }
+  .ring svg { transform: rotate(-90deg); display: block; }
+  .ring circle { fill: none; stroke-width: 4.5; stroke-linecap: round; }
+  .ring .track { stroke: var(--sunken); }
+  .ring .fill {
+    stroke: var(--accent);
+    transition: stroke-dashoffset 700ms var(--ease-out);
+  }
+  .ring b {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+
+  main { padding: 18px 16px calc(30px + env(safe-area-inset-bottom)); }
+
+  /* ---------- кнопки ---------- */
+
+  button {
+    font: inherit; border: 0; cursor: pointer; color: inherit;
+    transition: transform 120ms var(--ease-out), opacity 120ms var(--ease-out);
+  }
+  button:active { transform: scale(.97); }
+  button[disabled] { opacity: .5; transform: none; cursor: default; }
+
+  .cta {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 15px 18px; border-radius: var(--r-lg);
+    background: var(--accent); color: var(--accent-text);
+    font-size: 16px; font-weight: 620; letter-spacing: -.012em;
+    box-shadow: var(--shadow-accent);
+  }
+  .cta.secondary { background: var(--sunken); color: var(--text); font-weight: 500; box-shadow: none; }
+  .cta .arrow { font-size: 18px; line-height: 1; opacity: .85; }
+
+  /* ---------- карточка текущего урока ---------- */
+
+  .hero {
+    position: relative; overflow: hidden;
+    border-radius: var(--r-xl); padding: 18px 16px 16px; margin-bottom: 26px;
+    background:
+      linear-gradient(150deg,
+        color-mix(in srgb, var(--accent) 16%, var(--surface)),
+        var(--surface) 62%);
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: var(--shadow-md);
+  }
+  .hero-label {
+    font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--accent) 75%, var(--text));
+  }
+  .hero-title {
+    font-size: 20px; font-weight: 700; line-height: 1.25; letter-spacing: -.022em;
+    margin: 7px 0 4px;
+  }
+  .hero-sub { font-size: 13.5px; color: var(--hint); margin-bottom: 16px; }
+
+  /* ---------- секции и карточки уроков ---------- */
+
+  .tabs {
+    position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    background: var(--sunken); border-radius: var(--r-md); padding: 4px; margin-bottom: 14px;
+  }
+  .tabs-ind {
+    position: absolute; top: 4px; left: 4px; width: calc(50% - 4px); height: calc(100% - 8px);
+    background: var(--surface); border-radius: 10px; box-shadow: var(--shadow-sm);
+    transition: transform 260ms var(--ease-out);
+  }
+  .tab {
+    position: relative; z-index: 1; background: transparent; border-radius: 10px;
+    padding: 9px 6px; font-size: 14px; font-weight: 600; letter-spacing: -.01em;
+    color: var(--hint); transition: color 200ms ease;
+  }
+  .tab:active { transform: none; }
+  .tab.on { color: var(--text); }
+  .tab b {
+    font-weight: 600; margin-left: 5px; opacity: .55; font-variant-numeric: tabular-nums;
+  }
+  .tabs[data-tab="done"] .tabs-ind { transform: translateX(100%); }
+
+  .sec { display: flex; align-items: center; gap: 8px; margin: 0 2px 11px; }
+  .sec-title { font-size: 13.5px; font-weight: 650; letter-spacing: -.005em; }
+  .sec-count {
+    font-size: 12px; font-weight: 600; color: var(--hint);
+    background: var(--sunken); border-radius: 99px; padding: 2px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .list + .sec { margin-top: 26px; }
+
+  .item {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-lg); padding: 12px 14px; box-shadow: var(--shadow-sm);
+  }
+  .item.compact { padding: 10px 14px; background: transparent; box-shadow: none; }
+  .item.locked { opacity: .5; box-shadow: none; background: transparent; }
+  .item.locked .chev { visibility: hidden; }
+
+  .badge {
+    flex: none; width: 30px; height: 30px; border-radius: 10px;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums;
+    background: var(--sunken); color: var(--hint);
+  }
+  .item.done .badge { background: color-mix(in srgb, var(--done) 15%, transparent); color: var(--done); }
+  .item.pending .badge { background: var(--accent); color: var(--accent-text); }
+  .item.read .badge { background: color-mix(in srgb, var(--warn) 17%, transparent); color: var(--warn); }
+
+  .item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 3px; }
+  .item-title {
+    display: block; max-width: 100%;
+    font-size: 14.5px; font-weight: 550; letter-spacing: -.008em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .chip {
+    align-self: flex-start; font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
+    border-radius: 99px; padding: 2px 8px;
+    background: var(--sunken); color: var(--hint);
+  }
+  .chip.done { background: color-mix(in srgb, var(--done) 14%, transparent); color: var(--done); }
+  .chip.read { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .chip.pending { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .item-date { font-size: 12px; color: var(--hint); }
+  .chev { flex: none; color: var(--hint); opacity: .45; font-size: 17px; }
+
+  /* ---------- экран урока ---------- */
+
+  .meta { font-size: 13px; color: var(--hint); }
+  .lesson-title {
+    margin: 7px 0 18px; font-size: 24px; font-weight: 700;
+    line-height: 1.18; letter-spacing: -.028em;
+  }
+  .block {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl);
+    padding: 15px 16px; margin-bottom: 10px; box-shadow: var(--shadow-sm);
+  }
+  .block h2 {
+    margin: 0 0 10px; font-size: 11.5px; font-weight: 650;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--hint);
+  }
+  .block p { margin: 0; }
+
+  ol.numbered { margin: 0; padding: 0; list-style: none; counter-reset: n; }
+  ol.numbered li { counter-increment: n; position: relative; padding-left: 31px; margin-bottom: 11px; }
+  ol.numbered li:last-child { margin-bottom: 0; }
+  ol.numbered li::before {
+    content: counter(n); position: absolute; left: 0; top: 1px;
+    width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+    font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums;
+    background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent);
+  }
+  .block.warn ol.numbered li::before {
+    background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn);
+  }
+  .opts {
+    display: flex; flex-direction: column; gap: 3px;
+    margin-top: 6px; font-size: 14px; color: var(--hint);
+  }
+
+  .callout {
+    background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+    border-radius: var(--r-xl); padding: 15px 16px; margin-bottom: 10px;
+    font-size: 15.5px; font-weight: 500; letter-spacing: -.012em;
+  }
+
+  details.answers { margin-bottom: 10px; }
+  details.answers > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    background: var(--sunken); border-radius: var(--r-lg); padding: 13px 16px;
+    font-size: 14.5px; font-weight: 550;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: transform 120ms var(--ease-out);
+  }
+  details.answers > summary::-webkit-details-marker { display: none; }
+  details.answers > summary:active { transform: scale(.985); }
+  details.answers > summary::after {
+    content: "▾"; color: var(--hint); font-size: 12px;
+    transition: transform 220ms var(--ease-out);
+  }
+  details.answers > summary .lbl-open { display: none; }
+  details.answers[open] > summary { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+  details.answers[open] > summary .lbl { display: none; }
+  details.answers[open] > summary .lbl-open { display: inline; }
+  details.answers[open] > summary::after { transform: rotate(180deg); }
+  .answers-body {
+    background: var(--sunken); border-radius: 0 0 var(--r-lg) var(--r-lg);
+    padding: 2px 16px 15px; font-size: 14.5px;
+  }
+  .answers-body p { margin: 0 0 7px; }
+  .answers-body p:last-child { margin: 0; }
+
+  /* Панель действия всегда под рукой, а не в конце длинной прокрутки. */
+  .actionbar {
+    position: sticky; bottom: 0; z-index: 5;
+    margin: 18px -16px 0; padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+  .actionbar::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -18px; height: 18px;
+    background: linear-gradient(transparent, color-mix(in srgb, var(--bg) 78%, transparent));
+    pointer-events: none;
+  }
+  .actionbar .note {
+    text-align: center; font-size: 12.5px; color: var(--hint); margin-top: 9px;
+  }
+  .stack { display: flex; flex-direction: column; gap: 9px; }
+
+  /* ---------- чат с инструктором ---------- */
+
+  .ask {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: 12px 14px; margin: -12px 0 26px; box-shadow: var(--shadow-sm);
+  }
+  .ask .ico {
+    flex: none; width: 30px; height: 30px; border-radius: 10px;
+    display: grid; place-items: center; font-size: 15px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .ask .t { font-size: 14.5px; font-weight: 600; letter-spacing: -.008em; }
+  .ask .s { font-size: 12.5px; color: var(--hint); }
+
+  .link { flex: none; background: transparent; color: var(--accent); font-size: 14px; font-weight: 600; padding: 6px 2px; }
+
+  /* Поле ввода прижато к низу экрана, даже когда сообщений мало. */
+  .msgs {
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: calc(var(--tg-viewport-stable-height, 100dvh) - 190px);
+  }
+  .msg {
+    max-width: 86%; padding: 9px 13px; border-radius: 18px; font-size: 15px;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .msg.user {
+    align-self: flex-end; background: var(--accent); color: var(--accent-text);
+    border-bottom-right-radius: 6px;
+  }
+  .msg.assistant { align-self: flex-start; background: var(--sunken); border-bottom-left-radius: 6px; }
+  .msg.typing { color: var(--hint); }
+  .msg.err { background: color-mix(in srgb, #f04438 12%, var(--surface)); }
+  .suggest { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .suggest button {
+    text-align: left; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-md); padding: 10px 13px; font-size: 14px;
+  }
+  .composer { display: flex; align-items: flex-end; gap: 8px; }
+  .composer textarea {
+    flex: 1; resize: none; outline: none; max-height: 140px;
+    font: inherit; font-size: 16px; /* меньше 16px — iOS зумит поле при фокусе */
+    color: var(--text); background: var(--sunken);
+    border: 1px solid var(--line); border-radius: 21px; padding: 9px 14px;
+  }
+  .composer textarea:focus { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .send {
+    flex: none; width: 42px; height: 42px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-text); font-size: 19px; font-weight: 700;
+  }
+
+  /* ---------- состояния ---------- */
+
+  .center { text-align: center; color: var(--hint); padding: 10px 12px; font-size: 14.5px; }
+  .spinner {
+    width: 24px; height: 24px; margin: 56px auto 0; border-radius: 50%;
+    border: 2.5px solid var(--sunken); border-top-color: var(--accent);
+    animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .stage { transition: opacity 220ms var(--ease-out); }
+
+  .error {
+    background: color-mix(in srgb, #f04438 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, #f04438 30%, transparent);
+    border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 12px; font-size: 14.5px;
+  }
+  .empty { padding: 40px 18px; text-align: center; }
+  .empty .big { font-size: 36px; line-height: 1; margin-bottom: 14px; }
+  .empty .t { font-size: 17px; font-weight: 650; letter-spacing: -.015em; margin-bottom: 7px; }
+
+  .toast {
+    position: fixed; left: 16px; right: 16px; z-index: 20;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--done) 92%, black); color: #fff;
+    border-radius: var(--r-lg); padding: 13px 16px;
+    font-size: 14.5px; font-weight: 550; box-shadow: var(--shadow-md);
+    transition: transform 320ms var(--ease-out), opacity 320ms var(--ease-out);
+  }
+  .toast.warn { background: color-mix(in srgb, var(--warn) 92%, black); }
+  @starting-style { .toast { transform: translateY(120%); opacity: 0; } }
+  .toast.out { transform: translateY(120%); opacity: 0; }
+
+  [hidden] { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+      transition-duration: 120ms !important;
+    }
+    button:active { transform: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    header, .actionbar { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+</style>
+</head>
+<body>
+<div id="root"><div class="spinner"></div></div>
+
+<script>
+'use strict';
+
+const tg = window.Telegram && window.Telegram.WebApp;
+const root = document.getElementById('root');
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let state = null;
+let backHandler = null;
+let TAB = 'active';   // выбранная вкладка списка
+
+if (tg) {
+  tg.ready();
+  tg.expand();
+  document.documentElement.dataset.scheme = tg.colorScheme || 'light';
+  try { tg.setHeaderColor('bg_color'); } catch (e) {}
+  tg.onEvent('themeChanged', () => {
+    document.documentElement.dataset.scheme = tg.colorScheme || 'light';
+  });
+}
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Модель присылает Markdown: **жирный** превращаем в тег, прочие маркеры убираем.
+const md = s => esc(s)
+  .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  .replace(/__(.+?)__/g, '<b>$1</b>')
+  .replace(/[*_`]+/g, '');
+
+// Для сверки с заголовком снимаем разметку.
+const bare = s => String(s).replace(/[*_`#]+/g, '').trim();
+
+function haptic(kind) {
+  if (!tg || !tg.HapticFeedback) return;
+  try {
+    if (kind === 'success' || kind === 'error') tg.HapticFeedback.notificationOccurred(kind);
+    else tg.HapticFeedback.impactOccurred(kind || 'light');
+  } catch (e) {}
+}
+
+/* Отклик на нажатие, а не на отпускание. */
+function pressable(el, onTap) {
+  if (!el) return;
+  el.addEventListener('pointerdown', () => haptic('light'), { passive: true });
+  el.addEventListener('click', onTap);
+}
+
+function setBack(fn) {
+  backHandler = fn;
+  if (!tg || !tg.BackButton) return;
+  try {
+    tg.BackButton.offClick(dispatchBack);
+    if (fn) { tg.BackButton.onClick(dispatchBack); tg.BackButton.show(); }
+    else tg.BackButton.hide();
+  } catch (e) {}
+}
+function dispatchBack() { if (backHandler) backHandler(); }
+
+async function api(path, options) {
+  const opts = Object.assign({ headers: {} }, options || {});
+  opts.headers['X-Telegram-Init-Data'] = (tg && tg.initData) || '';
+  if (opts.body) opts.headers['Content-Type'] = 'application/json';
+  const res = await fetch(path, opts);
+  if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error === 'forbidden'
+      ? 'Эта мини-апка привязана к другому аккаунту Telegram.'
+      : 'Открой мини-апку из бота — Telegram не подтвердил подпись.');
+  }
+  return res.json().catch(() => ({ ok: false, error: 'bad_response' }));
+}
+
+const ERRORS = {
+  auth_required: 'Сессия Proffskills истекла — нужна свежая cookie на сервере.',
+  contract_required: 'Proffskills просит подписать договор, урок пока закрыт.',
+  too_short: 'Страница урока пришла пустой — похоже, он ещё не открыт.',
+  lesson_not_found: 'Урок не найден в базе бота.',
+  bad_response: 'Сервер ответил неожиданно.',
+  empty_message: 'Напиши вопрос.',
+};
+const errText = e => ERRORS[e] || ('Не получилось: ' + e);
+
+/* ---------- отрисовка экрана ---------- */
+
+function paint(html, opts) {
+  const o = opts || {};
+  root.innerHTML = '<div class="stage">' + html + '</div>';
+  const stage = root.firstElementChild;
+  if (!REDUCED) {
+    stage.animate(
+      [{ opacity: 0, transform: `translate3d(0, ${o.back ? -8 : 10}px, 0)` },
+       { opacity: 1, transform: 'translate3d(0, 0, 0)' }],
+      { duration: 240, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'both' }
+    );
+  }
+  return stage;
+}
+
+function stagger(nodes) {
+  if (REDUCED) return;
+  nodes.forEach((el, i) => {
+    if (i > 9) return;
+    el.animate(
+      [{ opacity: 0, transform: 'translate3d(0, 10px, 0)' },
+       { opacity: 1, transform: 'translate3d(0, 0, 0)' }],
+      { duration: 300, delay: 40 * i, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'both' }
+    );
+  });
+}
+
+const STAGES = ['Скачиваю урок…', 'Смотрю вопросы к уроку…', 'Собираю выжимку…', 'Почти готово…'];
+let stageTimer = null;
+
+function loading(first) {
+  clearInterval(stageTimer);
+  paint(`<div class="spinner"></div><div class="center" id="stage-text">${esc(first || STAGES[0])}</div>`);
+  let i = 0;
+  stageTimer = setInterval(() => {
+    i = Math.min(i + 1, STAGES.length - 1);
+    const el = document.getElementById('stage-text');
+    if (!el) return clearInterval(stageTimer);
+    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' }).finished
+      .then(() => {
+        el.textContent = STAGES[i];
+        el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, fill: 'forwards' });
+      }).catch(() => {});
+  }, 5200);
+}
+function stopLoading() { clearInterval(stageTimer); }
+
+function toast(text, kind) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 340);
+  }, 2800);
+}
+
+/* ---------- разбор выжимки ---------- */
+
+const HEADINGS = [
+  { re: /^кратко за 5 минут:?$/i,          type: 'text',    title: 'Кратко за 5 минут' },
+  { re: /^что обязательно запомнить:?$/i,  type: 'list',    title: 'Запомнить' },
+  { re: /^типичные ошибки новичков:?$/i,   type: 'warn',    title: 'Типичные ошибки' },
+  { re: /^мини-?тест:?$/i,                 type: 'quiz',    title: 'Мини-тест' },
+  { re: /^ответы:?$/i,                     type: 'answers', title: 'Ответы' },
+  { re: /^главный вывод:?$/i,              type: 'lead',    title: 'Главный вывод' },
+];
+
+function parseSummary(text) {
+  const lines = String(text || '').split('\n');
+  const blocks = [];
+  let current = { type: 'text', title: '', lines: [] };
+  let topic = '';
+  for (const raw of lines) {
+    const line = raw.trim();
+    const flat = bare(line);
+    const asTopic = flat.match(/^🚗?\s*Урок:\s*(.+)$/i);
+    if (asTopic && !topic) { topic = asTopic[1].trim(); continue; }
+    const head = HEADINGS.find(h => h.re.test(flat));
+    if (head) {
+      if (current.lines.length) blocks.push(current);
+      current = { type: head.type, title: head.title, lines: [] };
+      continue;
+    }
+    if (line) current.lines.push(line);
+  }
+  if (current.lines.length) blocks.push(current);
+  return { topic, blocks };
+}
+
+function renderBlock(b) {
+  const items = b.lines.map(l => l.replace(/^\s*(?:\d+[.)]|[-–—*•])\s*/, '').trim()).filter(Boolean);
+
+  if (b.type === 'lead') return `<div class="callout">${md(b.lines.join(' '))}</div>`;
+
+  if (b.type === 'answers') {
+    return `<details class="answers">
+      <summary><span class="lbl">Показать ответы</span><span class="lbl-open">Скрыть ответы</span></summary>
+      <div class="answers-body">${b.lines.map(l => `<p>${md(l)}</p>`).join('')}</div>
+    </details>`;
+  }
+  if (b.type === 'quiz') {
+    const qs = [];
+    for (const line of b.lines) {
+      if (/^\s*\d+[.)]/.test(bare(line))) qs.push({ q: bare(line).replace(/^\s*\d+[.)]\s*/, ''), opts: [] });
+      else if (qs.length) qs[qs.length - 1].opts.push(line);
+    }
+    if (!qs.length) return '';
+    return `<div class="block">
+      <h2>${esc(b.title)}</h2>
+      <ol class="numbered">${qs.map(q => `<li>${md(q.q)}
+        ${q.opts.length ? `<div class="opts">${q.opts.map(o => `<span>${md(o)}</span>`).join('')}</div>` : ''}
+      </li>`).join('')}</ol>
+    </div>`;
+  }
+  if (b.type === 'list' || b.type === 'warn') {
+    return `<div class="block${b.type === 'warn' ? ' warn' : ''}">
+      ${b.title ? `<h2>${esc(b.title)}</h2>` : ''}
+      <ol class="numbered">${items.map(i => `<li>${md(i)}</li>`).join('')}</ol>
+    </div>`;
+  }
+  return `<div class="block">
+    ${b.title ? `<h2>${esc(b.title)}</h2>` : ''}
+    <p>${md(b.lines.join(' '))}</p>
+  </div>`;
+}
+
+/* ---------- список уроков ---------- */
+
+const CHIP = {
+  done:    { cls: 'done',    text: 'Пройден' },
+  pending: { cls: 'pending', text: 'Можно проходить' },
+  read:    { cls: 'read',    text: 'Тест — на сайте' },
+  locked:  { cls: '',        text: 'Откроется позже' },
+};
+
+function lessonTitle(l) {
+  const t = (l.title || '').replace(/^\d+\s*Урок\.?\s*/i, '').trim();
+  return t && !/^Урок\s*\d+$/i.test(t) ? t : 'Урок №' + l.number;
+}
+function fmtDate(iso) {
+  const d = new Date(iso || '');
+  return isNaN(d) ? '' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+function renderItem(l, compact) {
+  const chip = CHIP[l.status] || CHIP.pending;
+  const sub = l.status === 'done' && l.completed_at
+    ? `<span class="item-date">${esc(fmtDate(l.completed_at))}</span>`
+    : `<span class="chip ${chip.cls}">${esc(chip.text)}</span>`;
+  return `<button class="item ${l.status}${compact ? ' compact' : ''}" data-id="${esc(l.id)}"${
+      l.status === 'locked' ? ' disabled' : ''}>
+    <span class="badge">${l.status === 'done' ? '✓' : l.status === 'locked' ? '🔒' : l.number}</span>
+    <span class="item-body">
+      <span class="item-title">${esc(lessonTitle(l))}</span>
+      ${sub}
+    </span>
+    <span class="chev">›</span>
+  </button>`;
+}
+
+function section(title, lessons, compact) {
+  if (!lessons.length) return '';
+  return `<div class="sec">
+      <span class="sec-title">${esc(title)}</span>
+      <span class="sec-count">${lessons.length}</span>
+    </div>
+    <div class="list">${lessons.map(l => renderItem(l, compact)).join('')}</div>`;
+}
+
+function renderHome(opts) {
+  setBack(null);
+  const byNum = [...state.lessons].sort((a, b) => a.lesson_number - b.lesson_number);
+  const active = byNum.filter(l => l.status === 'pending' || l.status === 'read');
+  const done = byNum.filter(l => l.status === 'done').reverse();
+  const locked = byNum.filter(l => l.status === 'locked');
+
+  // Кольцо считает прогресс по модулю, в котором сейчас учимся.
+  const focus = active[0] || done[0] || byNum[0] || {};
+  const mod = byNum.filter(l => (l.module_number || '') === (focus.module_number || ''));
+  const modDone = mod.filter(l => l.status === 'done').length;
+  const pct = mod.length ? modDone / mod.length : 0;
+  const R = 21, C = 2 * Math.PI * R;
+
+  const next = active[0];
+  const nextIsRead = next && next.status === 'read';
+
+  const stage = paint(`
+    <header>
+      <div class="head-text">
+        <div class="eyebrow">${focus.module_number ? 'Модуль ' + esc(focus.module_number) : 'Курс ПДД'}</div>
+        <h1>${esc(focus.module_title || 'Теория ПДД')}</h1>
+      </div>
+      <div class="ring">
+        <svg width="50" height="50" viewBox="0 0 50 50">
+          <circle class="track" cx="25" cy="25" r="${R}"></circle>
+          <circle class="fill" cx="25" cy="25" r="${R}"
+            stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}"></circle>
+        </svg>
+        <b>${modDone}/${mod.length}</b>
+      </div>
+    </header>
+    <main>
+      ${next ? `
+        <div class="hero">
+          <div class="hero-label">${nextIsRead ? 'Остался тест' : 'Сейчас учим'}</div>
+          <div class="hero-title">${esc(lessonTitle(next))}</div>
+          <div class="hero-sub">${nextIsRead
+            ? 'Конспект прочитан — сдай тест на сайте'
+            : 'Выжимка на 5 минут и вопросы инструктору'}</div>
+          <button class="cta" id="today">
+            ${nextIsRead ? 'Открыть урок' : 'Пройти урок'} <span class="arrow">→</span>
+          </button>
+        </div>` : `
+        <div class="hero">
+          <div class="hero-label">Всё открытое пройдено</div>
+          <div class="hero-title">Новых уроков пока нет</div>
+          <div class="hero-sub">Платформа откроет следующий, когда будет готов</div>
+          <button class="cta secondary" id="today">Проверить обновления</button>
+        </div>`}
+
+      <button class="ask" id="ask">
+        <span class="ico">💬</span>
+        <span class="item-body">
+          <span class="t">Спросить инструктора</span>
+          <span class="s">Ответит на любой вопрос по ПДД</span>
+        </span>
+        <span class="chev">›</span>
+      </button>
+
+      <div class="tabs" data-tab="${TAB}">
+        <span class="tabs-ind"></span>
+        <button class="tab${TAB === 'active' ? ' on' : ''}" data-go="active">Актуальные <b>${active.length}</b></button>
+        <button class="tab${TAB === 'done' ? ' on' : ''}" data-go="done">Пройденные <b>${done.length}</b></button>
+      </div>
+      <div id="lessons"></div>
+    </main>`, opts);
+
+  requestAnimationFrame(() => {
+    const fill = stage.querySelector('.ring .fill');
+    if (fill) fill.style.strokeDashoffset = (C * (1 - pct)).toFixed(1);
+  });
+
+  pressable(stage.querySelector('#today'), startToday);
+  pressable(stage.querySelector('#ask'), () => openChat(null, goHome));
+
+  const box = stage.querySelector('#lessons');
+  const tabs = stage.querySelector('.tabs');
+
+  function paintList(animate) {
+    box.innerHTML = TAB === 'done'
+      ? (done.length
+          ? `<div class="list">${done.map(l => renderItem(l, true)).join('')}</div>`
+          : `<div class="center">Пройденных уроков пока нет</div>`)
+      : (active.length || locked.length
+          ? `<div class="list">${active.map(l => renderItem(l)).join('')}</div>` +
+            (locked.length ? section('Откроются позже', locked, true) : '')
+          : `<div class="center">Все открытые уроки пройдены</div>`);
+    box.querySelectorAll('.item:not([disabled])').forEach(el =>
+      pressable(el, () => openLesson(el.dataset.id)));
+    if (animate) stagger([...box.querySelectorAll('.item')]);
+  }
+
+  tabs.querySelectorAll('.tab').forEach(btn => pressable(btn, () => {
+    if (TAB === btn.dataset.go) return;
+    TAB = btn.dataset.go;
+    tabs.dataset.tab = TAB;
+    tabs.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.go === TAB));
+    paintList(true);
+  }));
+
+  paintList(false);
+  stagger([...stage.querySelectorAll('.hero'), ...box.querySelectorAll('.item')]);
+}
+
+/* ---------- экран урока ---------- */
+
+function renderLesson(lesson, opts) {
+  const o = opts || {};
+  setBack(goHome);
+  const { topic, blocks } = parseSummary(lesson.summary);
+
+  const stage = paint(`
+    <main>
+      <div class="meta">${lesson.module_number ? `Модуль ${esc(lesson.module_number)} · ` : ''}Урок ${lesson.number}${
+        lesson.status === 'done' ? ' · пройден' : ''}</div>
+      <h1 class="lesson-title">${esc(topic || lessonTitle(lesson))}</h1>
+      ${o.note ? `<div class="error">${esc(o.note)}</div>` : ''}
+      ${blocks.map(renderBlock).join('')}
+      <div class="actionbar">
+        <div class="stack">
+          ${lesson.status === 'pending' ? `<button class="cta" id="complete">Прочитал</button>` : ''}
+          <button class="cta secondary" id="ask">💬 Спросить по уроку</button>
+          <button class="cta secondary" id="back">К списку уроков</button>
+        </div>
+        ${lesson.status === 'pending' ? `<div class="note">Урок отметится прочитанным на платформе,
+          после этого там откроется тест</div>` : ''}
+        ${lesson.status === 'read' ? `<div class="note">Конспект прочитан. Тест сдаётся на сайте платформы —
+          статус обновится сам</div>` : ''}
+      </div>
+    </main>`, o);
+
+  pressable(stage.querySelector('#back'), goHome);
+  pressable(stage.querySelector('#complete'), () => completeLesson(lesson, stage.querySelector('#complete')));
+  pressable(stage.querySelector('#ask'), () => openChat(lesson, () => renderLesson(lesson, { back: true })));
+  stagger([...stage.querySelectorAll('.block, .callout, details.answers')]);
+}
+
+function renderEmpty(icon, title, sub) {
+  setBack(goHome);
+  const stage = paint(`
+    <main>
+      <div class="empty">
+        <div class="big">${icon}</div>
+        <div class="t">${esc(title)}</div>
+        <div class="center">${esc(sub)}</div>
+      </div>
+      <div class="stack"><button class="cta secondary" id="back">К списку уроков</button></div>
+    </main>`);
+  pressable(stage.querySelector('#back'), goHome);
+}
+
+function fail(message) {
+  stopLoading();
+  setBack(goHome);
+  haptic('error');
+  const stage = paint(`
+    <main>
+      <div class="error">${esc(message)}</div>
+      <div class="stack"><button class="cta secondary" id="back">К списку уроков</button></div>
+    </main>`);
+  pressable(stage.querySelector('#back'), goHome);
+}
+
+/* ---------- чат с инструктором ---------- */
+
+const SUGGEST = [
+  'Кто уступает на нерегулируемом перекрёстке равнозначных дорог?',
+  'Чем остановка отличается от стоянки?',
+  'Когда разрешён обгон справа?',
+];
+
+const msgHtml = m => `<div class="msg ${m.role === 'user' ? 'user' : 'assistant'}">${
+  m.role === 'user' ? esc(m.content) : md(m.content)}</div>`;
+
+function scrollEnd(smooth) {
+  window.scrollTo({
+    top: document.documentElement.scrollHeight,
+    behavior: smooth && !REDUCED ? 'smooth' : 'auto',
+  });
+}
+
+async function openChat(lesson, back) {
+  setBack(back || goHome);
+  const stage = paint(`
+    <header>
+      <div class="head-text">
+        <div class="eyebrow">Инструктор ПДД</div>
+        <h1>${lesson ? esc(lessonTitle(lesson)) : 'Задай вопрос'}</h1>
+      </div>
+      <button class="link" id="clear" hidden>Очистить</button>
+    </header>
+    <main>
+      <div class="msgs" id="msgs"><div class="spinner"></div></div>
+      <div class="actionbar">
+        <form class="composer" id="composer">
+          <textarea id="q" rows="1" placeholder="Спроси про любое правило…"></textarea>
+          <button class="send" id="send" type="submit" aria-label="Отправить">↑</button>
+        </form>
+      </div>
+    </main>`);
+
+  const box = stage.querySelector('#msgs');
+  const input = stage.querySelector('#q');
+  const sendBtn = stage.querySelector('#send');
+  const clearBtn = stage.querySelector('#clear');
+  let busy = false;
+
+  function paintMsgs(messages) {
+    clearBtn.hidden = !messages.length;
+    box.innerHTML = messages.length
+      ? messages.map(msgHtml).join('')
+      : `<div class="center">Спроси что-нибудь${lesson ? ' по этому уроку' : ' про ПДД'} — отвечу коротко и по делу.</div>
+         <div class="suggest">${SUGGEST.map(s => `<button type="button">${esc(s)}</button>`).join('')}</div>`;
+    box.querySelectorAll('.suggest button').forEach(b => pressable(b, () => ask(b.textContent)));
+  }
+
+  function autosize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  }
+
+  async function ask(text) {
+    const question = String(text || '').trim();
+    if (!question || busy) return;
+    busy = true;
+    sendBtn.disabled = true;
+    if (!box.querySelector('.msg')) box.innerHTML = '';
+    clearBtn.hidden = false;
+    box.insertAdjacentHTML('beforeend', msgHtml({ role: 'user', content: question }));
+    box.insertAdjacentHTML('beforeend', '<div class="msg assistant typing">Думаю…</div>');
+    input.value = '';
+    autosize();
+    scrollEnd(true);
+    try {
+      const data = await api('/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message: question, lesson_id: lesson ? lesson.id : '' }),
+      });
+      const typing = box.querySelector('.typing');
+      if (data.ok) {
+        typing.outerHTML = msgHtml({ role: 'assistant', content: data.answer });
+        haptic('light');
+      } else {
+        typing.className = 'msg assistant err';
+        typing.textContent = errText(data.error);
+        haptic('error');
+      }
+    } catch (e) {
+      const typing = box.querySelector('.typing');
+      if (typing) { typing.className = 'msg assistant err'; typing.textContent = e.message; }
+    }
+    busy = false;
+    sendBtn.disabled = false;
+    scrollEnd(true);
+  }
+
+  input.addEventListener('input', autosize);
+  stage.querySelector('#composer').addEventListener('submit', e => {
+    e.preventDefault();
+    haptic('light');
+    ask(input.value);
+  });
+
+  pressable(clearBtn, () => {
+    const wipe = async () => {
+      try { await api('/api/chat/clear', { method: 'POST' }); } catch (e) {}
+      paintMsgs([]);
+    };
+    if (tg && tg.showConfirm) tg.showConfirm('Очистить историю переписки?', ok => { if (ok) wipe(); });
+    else wipe();
+  });
+
+  try {
+    const data = await api('/api/chat');
+    paintMsgs(data.ok ? data.messages : []);
+    scrollEnd(false);
+  } catch (e) {
+    box.innerHTML = `<div class="error">${esc(e.message)}</div>`;
+  }
+}
+
+/* ---------- действия ---------- */
+
+async function openLesson(id) {
+  const known = state && state.lessons.find(l => l.id === id);
+  loading(known && known.has_summary ? 'Открываю урок…' : STAGES[0]);
+  try {
+    const data = await api('/api/lesson?id=' + encodeURIComponent(id));
+    stopLoading();
+    if (!data.ok) return fail(errText(data.error));
+    renderLesson(data.lesson);
+  } catch (e) { fail(e.message); }
+}
+
+async function startToday() {
+  loading();
+  try {
+    const data = await api('/api/today', { method: 'POST' });
+    stopLoading();
+    if (data.no_lessons) {
+      const waiting = (data.waiting_test || [])[0];
+      return waiting
+        ? renderEmpty('⏳', 'Курс ждёт платформу',
+            `Урок «${lessonTitle(waiting)}» прочитан. Сдай тест к нему на сайте — после этого откроется следующий.`)
+        : renderEmpty('✅', 'Все открытые уроки пройдены',
+            'Следующий появится, когда платформа его откроет.');
+    }
+    if (!data.ok) return fail(errText(data.error));
+    haptic('medium');
+    renderLesson(data.lesson);
+  } catch (e) { fail(e.message); }
+}
+
+async function completeLesson(lesson, btn) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Отмечаю…';
+  try {
+    const data = await api('/api/complete', {
+      method: 'POST',
+      body: JSON.stringify({ id: lesson.id }),
+    });
+    if (!data.ok) {
+      btn.disabled = false;
+      btn.textContent = label;
+      return fail(errText(data.error));
+    }
+    haptic('success');
+    toast('Урок отмечен прочитанным — тест ждёт на сайте');
+    await load(true);
+    goHome();
+  } catch (e) { fail(e.message); }
+}
+
+function goHome() {
+  if (state) renderHome({ back: true });
+  else load();
+}
+
+async function load(silent) {
+  if (!silent) loading('Загружаю прогресс…');
+  try {
+    const data = await api('/api/state');
+    if (!data.ok) { if (!silent) fail('Не удалось загрузить прогресс: ' + data.error); return; }
+    state = data;
+    if (!silent) { stopLoading(); renderHome(); }
+  } catch (e) { if (!silent) fail(e.message); }
+}
+
+load();
+</script>
+</body>
+</html>

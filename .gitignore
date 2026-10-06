@@ -1,0 +1,21 @@
+# Секреты и состояние — только на сервере
+autoschool.env
+*.cookie
+*.cookies
+state.json
+run/
+*.log
+*.pid
+
+# Бэкапы и мусор
+*.bak
+*.bak-*
+*.bak[0-9]-*
+__pycache__/
+*.pyc
+venv/
+
+# Конфиг xray с ключами VPN
+xray/config.json
+xray/subscription.url
+*.db

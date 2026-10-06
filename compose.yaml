@@ -1,0 +1,27 @@
+services:
+  xray:
+    image: ghcr.io/xtls/xray-core:latest
+    command: run -c /etc/xray/config.json
+    restart: unless-stopped
+    volumes:
+      # Конфиг собирается из VPN-подписки (xray/gen_config.py) и лежит вне репо
+      - ${XRAY_CONFIG:-./xray/config.json}:/etc/xray/config.json:ro
+    ports:
+      - "127.0.0.1:10809:10809"   # HTTP-прокси для хоста (tailscaled)
+
+  helper:
+    build: ./helper
+    image: autoschool-helper
+    restart: unless-stopped
+    env_file: helper/autoschool.env
+    volumes:
+      - helper-data:/data
+    ports:
+      - "127.0.0.1:8787:8787"     # служебный API
+      - "127.0.0.1:8790:8790"     # мини-апка, наружу — через Tailscale Funnel
+    depends_on:
+      - xray
+
+volumes:
+  helper-data:
+    name: helper-data
